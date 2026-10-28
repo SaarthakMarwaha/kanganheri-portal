@@ -1,0 +1,514 @@
+// ============================================================
+// Prisma Schema — Kanganheri Darpan
+// PostgreSQL + PgBouncer connection pooling
+// All tables normalized to 3NF with explicit performance indexes
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins", "omitApi"]
+  output          = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Runtime URL points to PgBouncer / connection pooler
+  url       = env("DATABASE_URL")
+  // Direct URL bypasses pooler — used only for migrations
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  ADMIN     // Full portal administration
+  MODERATOR // Can approve listings, update complaint status
+  RESIDENT  // Public-facing (future: optional account)
+}
+
+enum ComplaintStatus {
+  PENDING    // Submitted, awaiting triage
+  REVIEWING  // Assigned to moderator
+  IN_PROGRESS // Escalated to civic authority
+  RESOLVED   // Marked resolved
+  REJECTED   // Duplicate/invalid
+  CLOSED     // Auto-closed after 90 days
+}
+
+enum ComplaintCategory {
+  WATERLOGGING
+  POTHOLE
+  BROKEN_STREETLIGHT
+  SANITATION
+  GARBAGE_DUMP
+  WATER_SUPPLY
+  ELECTRICITY_OUTAGE
+  STRAY_ANIMALS
+  ENCROACHMENT
+  ROAD_DAMAGE
+  OTHER
+}
+
+enum BusinessCategory {
+  ELECTRICIAN
+  PLUMBER
+  CARPENTER
+  MASON
+  PAINTER
+  DAIRY_FARM
+  GROCERY
+  MEDICAL_CLINIC
+  PHARMACY
+  HARDWARE
+  TRANSPORT
+  VEHICLE_REPAIR
+  TAILOR
+  BEAUTY_SALON
+  TUITION_CENTER
+  RELIGIOUS_PLACE
+  RATION_SHOP
+  GENERAL_STORE
+  OTHER
+}
+
+enum VerificationStatus {
+  PENDING  // Submitted by owner, awaiting admin verification
+  VERIFIED // Admin verified physical existence
+  REJECTED // Failed verification
+  SUSPENDED // Temporarily suspended
+}
+
+enum EmergencyContactType {
+  POLICE
+  AMBULANCE
+  FIRE_BRIGADE
+  POWER_UTILITY   // BSES Rajdhani helpline
+  WATER_UTILITY   // Delhi Jal Board tanker/helpline
+  HOSPITAL
+  DISPENSARY
+  SCHOOL
+  GOVERNMENT_OFFICE
+  OTHER
+}
+
+enum AuditAction {
+  // Auth
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  ADMIN_LOGIN_FAILED
+  TOKEN_REFRESH
+  TOKEN_REVOKED
+  // Complaints
+  COMPLAINT_STATUS_UPDATED
+  COMPLAINT_DELETED
+  // Business Directory
+  BUSINESS_APPROVED
+  BUSINESS_REJECTED
+  BUSINESS_SUSPENDED
+  BUSINESS_DELETED
+  // Notices
+  NOTICE_PUBLISHED
+  NOTICE_UPDATED
+  NOTICE_DELETED
+  // Data Privacy
+  DATA_ERASURE_INITIATED
+  DATA_ERASURE_COMPLETED
+  // System
+  HEALTHCHECK_FAILED
+  RATE_LIMIT_TRIGGERED
+}
+
+enum DataRequestStatus {
+  PENDING
+  VERIFIED   // Phone/tracking ID verified
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================================
+// USER & AUTHENTICATION
+// ============================================================
+
+/// Admin and Moderator users — not exposed to public residents.
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  /// Bcrypt-hashed password (min cost factor 12)
+  passwordHash String    @map("password_hash")
+  displayName  String    @map("display_name")
+  role         UserRole  @default(MODERATOR)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  sessions  Session[]
+  auditLogs AuditLog[]
+
+  @@index([email])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+/// Refresh token sessions with family-based revocation support.
+/// Access tokens are short-lived JWTs (15 min); refresh tokens live here.
+model Session {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  /// SHA-256 hash of the refresh token — never store raw token
+  tokenHash        String    @unique @map("token_hash")
+  /// Family ID: all tokens derived from the original login share a family.
+  /// If token reuse is detected, the entire family is revoked.
+  familyId         String    @map("family_id")
+  isRevoked        Boolean   @default(false) @map("is_revoked")
+  /// Hashed IP address (SHA-256 + daily rotating salt) — DPDP compliant
+  ipHash           String?   @map("ip_hash")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@index([isRevoked, expiresAt])
+  @@map("sessions")
+}
+
+// ============================================================
+// COMPLAINTS (SHIKAYAT) ENGINE
+// ============================================================
+
+/// Public civic complaints submitted by residents without login.
+model Complaint {
+  id              String           @id @default(cuid())
+  /// Human-readable tracking ID: KH-YYYY-XXXX (e.g., KH-2025-0042)
+  trackingId      String           @unique @map("tracking_id")
+  status          ComplaintStatus  @default(PENDING)
+  category        ComplaintCategory
+  /// Street/locality within Kanganheri (e.g., "Gandhi Nagar Gali No. 3")
+  streetTag       String           @map("street_tag")
+  /// Ward number or area identifier for MCD routing
+  wardTag         String?          @map("ward_tag")
+  /// Bilingual description
+  descriptionEn   String?          @db.Text @map("description_en")
+  descriptionHi   String           @db.Text @map("description_hi")
+  /// Contact phone (optional; used for status SMS notifications)
+  contactPhone    String?          @map("contact_phone")
+  /// Community upvote count (denormalized for fast reads)
+  upvoteCount     Int              @default(0) @map("upvote_count")
+  /// Hashed IP of submitter — never raw IP
+  submitterIpHash String?          @map("submitter_ip_hash")
+  /// Idempotency key used at submission to prevent duplicates
+  idempotencyKey  String?          @unique @map("idempotency_key")
+  /// Admin/moderator notes (internal, never public)
+  adminNotes      String?          @db.Text @map("admin_notes")
+  /// Resolved at timestamp
+  resolvedAt      DateTime?        @map("resolved_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  photos      ComplaintPhoto[]
+  upvotes     ComplaintUpvote[]
+  statusHistory ComplaintStatusHistory[]
+
+  @@index([trackingId])
+  @@index([status])
+  @@index([category])
+  @@index([streetTag])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@map("complaints")
+}
+
+/// Photos attached to a complaint — stored as object-storage keys.
+model ComplaintPhoto {
+  id          String    @id @default(cuid())
+  complaintId String    @map("complaint_id")
+  /// Object storage key (e.g., S3/R2 key), NOT a public URL
+  storageKey  String    @map("storage_key")
+  /// Public CDN URL after processing (WebP/AVIF, EXIF-stripped)
+  publicUrl   String    @map("public_url")
+  /// MIME type post-conversion (always image/webp or image/avif)
+  mimeType    String    @default("image/webp") @map("mime_type")
+  fileSizeBytes Int?    @map("file_size_bytes")
+  width       Int?
+  height      Int?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+  @@map("complaint_photos")
+}
+
+/// Immutable status change history for each complaint.
+model ComplaintStatusHistory {
+  id          String          @id @default(cuid())
+  complaintId String          @map("complaint_id")
+  fromStatus  ComplaintStatus? @map("from_status")
+  toStatus    ComplaintStatus @map("to_status")
+  /// Moderator note shown on the public timeline
+  publicNote  String?         @db.Text @map("public_note")
+  /// Actor: "system" or a User.id
+  actorId     String?         @map("actor_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+  @@index([createdAt])
+  @@map("complaint_status_history")
+}
+
+/// Community upvotes on complaints — one per hashed-IP per complaint.
+model ComplaintUpvote {
+  id          String   @id @default(cuid())
+  complaintId String   @map("complaint_id")
+  /// Hashed IP to prevent duplicate upvotes without storing raw IPs
+  ipHash      String   @map("ip_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@unique([complaintId, ipHash])
+  @@index([complaintId])
+  @@map("complaint_upvotes")
+}
+
+// ============================================================
+// BUSINESS & KARIGAAR DIRECTORY
+// ============================================================
+
+/// Verified local business and artisan (karigaar) listings.
+model BusinessListing {
+  id                 String             @id @default(cuid())
+  /// Bilingual name
+  nameEn             String             @map("name_en")
+  nameHi             String             @map("name_hi")
+  category           BusinessCategory
+  /// Bilingual short description
+  descriptionEn      String?            @db.Text @map("description_en")
+  descriptionHi      String?            @db.Text @map("description_hi")
+  /// Primary contact (WhatsApp/call)
+  phone              String
+  /// Secondary contact
+  phoneAlt           String?            @map("phone_alt")
+  /// Physical address within Kanganheri
+  addressEn          String?            @map("address_en")
+  addressHi          String?            @map("address_hi")
+  /// Street/gali tag for filtering
+  streetTag          String?            @map("street_tag")
+  /// Profile photo storage key
+  photoStorageKey    String?            @map("photo_storage_key")
+  photoPublicUrl     String?            @map("photo_public_url")
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedAt         DateTime?          @map("verified_at")
+  verifiedById       String?            @map("verified_by_id")
+  /// Owner-submitted; hashed IP of submitter
+  submitterIpHash    String?            @map("submitter_ip_hash")
+  idempotencyKey     String?            @unique @map("idempotency_key")
+  isActive           Boolean            @default(true) @map("is_active")
+  /// SEO-friendly slug (auto-generated from nameEn + cuid)
+  slug               String             @unique
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([verificationStatus])
+  @@index([phone])
+  @@index([slug])
+  @@index([isActive, verificationStatus])
+  @@index([category, isActive, verificationStatus])
+  @@map("business_listings")
+}
+
+// ============================================================
+// NOTICES (CHAUPAL / NOTICEBOARD)
+// ============================================================
+
+/// Digital noticeboard announcements published by admins/moderators.
+model Notice {
+  id           String    @id @default(cuid())
+  titleEn      String    @map("title_en")
+  titleHi      String    @map("title_hi")
+  bodyEn       String?   @db.Text @map("body_en")
+  bodyHi       String    @db.Text @map("body_hi")
+  /// Optional attachment URL (e.g., PDF via object storage)
+  attachmentUrl String?  @map("attachment_url")
+  /// Whether this notice is pinned to the top of the noticeboard
+  isPinned     Boolean   @default(false) @map("is_pinned")
+  isPublished  Boolean   @default(false) @map("is_published")
+  publishedAt  DateTime? @map("published_at")
+  expiresAt    DateTime? @map("expires_at")
+  publishedById String?  @map("published_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([isPublished, isPinned])
+  @@index([publishedAt])
+  @@index([expiresAt])
+  @@map("notices")
+}
+
+// ============================================================
+// EMERGENCY CONTACTS HUB
+// ============================================================
+
+/// Offline-capable emergency and civic contact directory.
+model EmergencyContact {
+  id            String               @id @default(cuid())
+  type          EmergencyContactType
+  nameEn        String               @map("name_en")
+  nameHi        String               @map("name_hi")
+  /// Primary phone (tel: link)
+  phone         String
+  /// Secondary/toll-free number
+  phoneTollFree String?              @map("phone_toll_free")
+  /// Optional WhatsApp number
+  phoneWhatsapp String?              @map("phone_whatsapp")
+  descriptionEn String?              @map("description_en")
+  descriptionHi String?              @map("description_hi")
+  addressEn     String?              @map("address_en")
+  addressHi     String?              @map("address_hi")
+  /// Display order (lower = higher priority on page)
+  sortOrder     Int                  @default(100) @map("sort_order")
+  isActive      Boolean              @default(true) @map("is_active")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([isActive, sortOrder])
+  @@index([type, isActive])
+  @@map("emergency_contacts")
+}
+
+// ============================================================
+// VILLAGE HERITAGE & ACHIEVERS
+// ============================================================
+
+/// Village history sections, martyrs wall, and achievers profiles.
+model HeritagePage {
+  id            String   @id @default(cuid())
+  slugEn        String   @unique @map("slug_en")
+  titleEn       String   @map("title_en")
+  titleHi       String   @map("title_hi")
+  contentEn     String   @db.Text @map("content_en")
+  contentHi     String   @db.Text @map("content_hi")
+  heroImageUrl  String?  @map("hero_image_url")
+  /// Display category: "history" | "martyr" | "achiever" | "infrastructure"
+  category      String
+  sortOrder     Int      @default(100) @map("sort_order")
+  isPublished   Boolean  @default(false) @map("is_published")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([slugEn])
+  @@index([category, isPublished])
+  @@map("heritage_pages")
+}
+
+// ============================================================
+// AUDIT LOG (APPEND-ONLY)
+// ============================================================
+
+/// Immutable append-only audit trail for all admin/moderator actions.
+/// No UPDATE or DELETE queries should ever target this table.
+model AuditLog {
+  id                String      @id @default(cuid())
+  /// The admin/moderator who performed the action (null for system/public)
+  actorId           String?     @map("actor_id")
+  actorRole         UserRole?   @map("actor_role")
+  action            AuditAction
+  /// Entity type affected (e.g., "Complaint", "BusinessListing")
+  entityType        String      @map("entity_type")
+  /// The cuid of the affected entity
+  entityId          String?     @map("entity_id")
+  /// JSON snapshot of state before the action (null for CREATE)
+  previousStateJson Json?       @map("previous_state_json")
+  /// JSON snapshot of state after the action (null for DELETE)
+  newStateJson      Json?       @map("new_state_json")
+  /// Hashed IP of actor — DPDP compliant
+  ipHash            String?     @map("ip_hash")
+  userAgent         String?     @map("user_agent")
+  /// Additional contextual metadata
+  metaJson          Json?       @map("meta_json")
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// IDEMPOTENCY RECORDS
+// ============================================================
+
+/// Stores idempotency keys for write operations to prevent duplicate
+/// submissions on flaky mobile networks.
+model IdempotencyRecord {
+  id             String   @id @default(cuid())
+  /// UUIDv4 generated on the client at form mount
+  key            String   @unique
+  /// HTTP method + path (e.g., "POST:/api/v1/complaints")
+  endpoint       String
+  /// HTTP status code of the original response
+  responseStatus Int      @map("response_status")
+  /// Cached response body (JSON-encoded string, max 64KB)
+  responseBody   String   @db.Text @map("response_body")
+  /// Hashed IP of requester
+  ipHash         String?  @map("ip_hash")
+  /// Expires at: now + 24h — cron job purges expired records
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([key])
+  @@index([expiresAt])
+  @@index([endpoint, ipHash])
+  @@map("idempotency_records")
+}
+
+// ============================================================
+// DATA PRIVACY / DPDP ACT 2023 — ERASURE REQUESTS
+// ============================================================
+
+/// Self-service data deletion requests from residents or listed
+/// shopkeepers. Verified via phone number or tracking ID.
+model DataDeletionRequest {
+  id                  String            @id @default(cuid())
+  status              DataRequestStatus @default(PENDING)
+  /// Type of entity to erase: "complaint" | "business_listing"
+  entityType          String            @map("entity_type")
+  /// The tracking ID (for complaints) or slug (for business) to erase
+  entityIdentifier    String            @map("entity_identifier")
+  /// Verification token sent to requestor's phone (hashed)
+  verificationTokenHash String?         @map("verification_token_hash")
+  verificationExpiresAt DateTime?       @map("verification_expires_at")
+  verifiedAt          DateTime?         @map("verified_at")
+  /// Processing notes (internal)
+  processingNotes     String?           @db.Text @map("processing_notes")
+  completedAt         DateTime?         @map("completed_at")
+  /// Hashed IP of requester
+  requesterIpHash     String?           @map("requester_ip_hash")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([entityType, entityIdentifier])
+  @@index([createdAt])
+  @@map("data_deletion_requests")
+}

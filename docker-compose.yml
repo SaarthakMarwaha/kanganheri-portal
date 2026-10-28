@@ -1,0 +1,169 @@
+# ==============================================================================
+# Kanganheri Darpan (कांगनहेड़ी दर्पण) — Docker Compose Multi-Service Stack
+# Orchestrating Next.js 15, PostgreSQL 16, PgBouncer Pooler & Redis 7
+# ==============================================================================
+
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------------------------
+  # Next.js 15 Web Application
+  # ----------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kanganheri_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_APP_URL=https://kanganheri.com
+      - ALLOWED_ORIGINS=https://kanganheri.com,http://localhost:3000
+      # Connection pooler URL for runtime transactions
+      - DATABASE_URL=postgresql://kanganheri_app:kanganheri_secure_pass_2026@pgbouncer:6432/kanganheri_db?pgbouncer=true&connection_limit=10
+      # Direct PostgreSQL URL for migrations & introspection
+      - DIRECT_URL=postgresql://kanganheri_app:kanganheri_secure_pass_2026@postgres:5432/kanganheri_db
+      # Redis Cache & Rate Limiting
+      - REDIS_URL=redis://:kanganheri_redis_pass_2026@redis:6379
+      # Security Keys
+      - JWT_ACCESS_SECRET=kanganheri_super_secure_jwt_access_secret_min_32_bytes_2026
+      - JWT_REFRESH_SECRET=kanganheri_super_secure_jwt_refresh_secret_min_32_bytes_2026
+      - IP_HASH_SALT=kanganheri_daily_rotating_salt_for_dpdp_compliance_2026
+      # Cloudflare Turnstile (Test keys by default)
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+      - TURNSTILE_SECRET_KEY=1x00000000000000000000000000000000000000AA
+    volumes:
+      - app_uploads:/app/uploads
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kanganheri_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ----------------------------------------------------------------------------
+  # PostgreSQL 16 Database
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: kanganheri_postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432" # Exposed only to localhost for direct admin migrations
+    environment:
+      POSTGRES_USER: kanganheri_app
+      POSTGRES_PASSWORD: kanganheri_secure_pass_2026
+      POSTGRES_DB: kanganheri_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kanganheri_internal
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kanganheri_app -d kanganheri_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # PgBouncer Connection Pooler (Transaction Mode)
+  # ----------------------------------------------------------------------------
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.22.0
+    container_name: kanganheri_pgbouncer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6432:6432"
+    environment:
+      - DB_USER=kanganheri_app
+      - DB_PASSWORD=kanganheri_secure_pass_2026
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=kanganheri_db
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=500
+      - DEFAULT_POOL_SIZE=20
+      - MIN_POOL_SIZE=5
+      - RESERVE_POOL_SIZE=5
+      - AUTH_TYPE=plain
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kanganheri_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U kanganheri_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ----------------------------------------------------------------------------
+  # Redis 7 Cache & Rate Limiting
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: kanganheri_redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --requirepass kanganheri_redis_pass_2026
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - kanganheri_internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a kanganheri_redis_pass_2026 ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+# ------------------------------------------------------------------------------
+# Persistent Storage Volumes
+# ------------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: kanganheri_postgres_data
+  redis_data:
+    name: kanganheri_redis_data
+  app_uploads:
+    name: kanganheri_app_uploads
+
+# ------------------------------------------------------------------------------
+# Isolated Network
+# ------------------------------------------------------------------------------
+networks:
+  kanganheri_internal:
+    name: kanganheri_network
+    driver: bridge

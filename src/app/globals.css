@@ -1,0 +1,433 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+/* ============================================================
+   KANGANHERI DARPAN — Design Tokens & Global Styles
+   ============================================================
+   All CSS Custom Properties (design tokens) are defined here.
+   Tailwind config maps these tokens into utility classes.
+   ============================================================ */
+
+/* ── Light Theme Tokens ──────────────────────────────────── */
+:root {
+  /* Background / surface colors */
+  --background: 40 30% 97%; /* Warm off-white (parchment feel) */
+  --foreground: 25 20% 12%; /* Near-black, warm tone */
+
+  /* Primary: Saffron-inspired (civic warmth, India flag saffron hue) */
+  --primary: 30 85% 50%; /* Deep saffron orange */
+  --primary-foreground: 0 0% 100%;
+  --primary-50: 30 100% 97%;
+  --primary-100: 30 100% 92%;
+  --primary-200: 30 95% 82%;
+  --primary-700: 28 80% 38%;
+  --primary-800: 26 75% 28%;
+
+  /* Secondary: Earthy green (agriculture, nature, rural India) */
+  --secondary: 135 35% 42%; /* Forest green */
+  --secondary-foreground: 0 0% 100%;
+
+  /* Civic green: Verified, resolved, approved */
+  --civic-green: 142 72% 35%; /* Rich green */
+  --civic-green-foreground: 0 0% 100%;
+  --civic-green-light: 142 72% 95%;
+
+  /* Warning amber: Pending, in-progress, price warnings */
+  --warning-amber: 38 92% 45%; /* Rich amber */
+  --warning-amber-foreground: 0 0% 100%;
+  --warning-amber-light: 48 100% 93%;
+
+  /* Danger red: Emergency, rejected, destructive */
+  --danger-red: 0 80% 48%; /* Clear red */
+  --danger-red-foreground: 0 0% 100%;
+  --danger-red-light: 0 100% 96%;
+
+  /* Card / popover surfaces */
+  --card: 0 0% 100%;
+  --card-foreground: 25 20% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 25 20% 12%;
+
+  /* Muted: placeholders, captions, disabled state */
+  --muted: 40 20% 94%;
+  --muted-foreground: 25 10% 48%;
+
+  /* Accent: Hover highlights, active states */
+  --accent: 30 80% 95%;
+  --accent-foreground: 30 85% 35%;
+
+  /* Destructive: Form errors, danger confirmations */
+  --destructive: 0 80% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Form elements */
+  --border: 40 15% 87%;
+  --input: 40 15% 87%;
+  --ring: 30 85% 50%; /* Primary color focus ring */
+
+  /* Data visualization */
+  --chart-1: 30 85% 50%; /* Saffron */
+  --chart-2: 135 35% 42%; /* Green */
+  --chart-3: 212 80% 48%; /* Blue */
+  --chart-4: 272 55% 52%; /* Purple */
+  --chart-5: 38 92% 45%; /* Amber */
+
+  /* Border radius — rounded but not bubbly (civic authority feel) */
+  --radius: 0.5rem;
+
+  /* Section padding — responsive via clamp */
+  --section-padding: clamp(2rem, 5vw, 4rem);
+
+  /* ── Fluid Typography Scale (clamp: min, fluid, max) ────── */
+  --text-xs: clamp(0.688rem, 0.65rem + 0.19vw, 0.75rem);
+  --text-sm: clamp(0.813rem, 0.78rem + 0.16vw, 0.875rem);
+  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1.05rem + 0.38vw, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 1.35rem + 0.75vw, 1.875rem);
+  --text-3xl: clamp(1.875rem, 1.65rem + 1.13vw, 2.25rem);
+  --text-4xl: clamp(2.25rem, 1.95rem + 1.5vw, 3rem);
+  --text-5xl: clamp(3rem, 2.5rem + 2.5vw, 4rem);
+}
+
+/* ── Dark Theme Tokens ───────────────────────────────────── */
+.dark {
+  --background: 25 15% 8%;
+  --foreground: 40 20% 93%;
+
+  --primary: 30 90% 58%;
+  --primary-foreground: 25 15% 8%;
+
+  --secondary: 135 30% 52%;
+  --secondary-foreground: 0 0% 100%;
+
+  --civic-green: 142 65% 48%;
+  --civic-green-foreground: 0 0% 100%;
+  --civic-green-light: 142 50% 15%;
+
+  --warning-amber: 38 88% 58%;
+  --warning-amber-foreground: 25 15% 8%;
+  --warning-amber-light: 38 70% 18%;
+
+  --danger-red: 0 75% 60%;
+  --danger-red-foreground: 0 0% 100%;
+  --danger-red-light: 0 70% 18%;
+
+  --card: 25 15% 12%;
+  --card-foreground: 40 20% 93%;
+  --popover: 25 15% 10%;
+  --popover-foreground: 40 20% 93%;
+
+  --muted: 25 12% 18%;
+  --muted-foreground: 40 15% 60%;
+
+  --accent: 30 50% 18%;
+  --accent-foreground: 30 85% 65%;
+
+  --destructive: 0 65% 55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 25 12% 22%;
+  --input: 25 12% 22%;
+  --ring: 30 90% 58%;
+}
+
+/* ============================================================
+   GLOBAL BASE STYLES
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* Smooth scrolling with respect for user motion preferences */
+  scroll-behavior: smooth;
+  /* Prevent iOS text size adjustment after orientation change */
+  -webkit-text-size-adjust: 100%;
+  /* Consistent tap highlight */
+  -webkit-tap-highlight-color: hsl(var(--primary) / 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family:
+    var(--font-inter),
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  /* Optimize text rendering */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal overflow on mobile */
+  overflow-x: hidden;
+}
+
+/* Apply Devanagari font + wider line height for Hindi text */
+:lang(hi),
+.font-devanagari,
+[data-locale="hi"] {
+  font-family: var(--font-noto-devanagari), var(--font-inter), system-ui, sans-serif;
+  line-height: 1.7; /* Prevents matra (vowel diacritics) clipping */
+}
+
+/* ── Focus Styles (WCAG 2.1 AA) ──────────────────────────── */
+/* Remove default outline, replace with themed focus ring */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+/* ── Typography Base ─────────────────────────────────────── */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: hsl(var(--foreground));
+}
+
+h1 {
+  font-size: var(--text-4xl);
+}
+h2 {
+  font-size: var(--text-3xl);
+}
+h3 {
+  font-size: var(--text-2xl);
+}
+h4 {
+  font-size: var(--text-xl);
+}
+h5 {
+  font-size: var(--text-lg);
+}
+h6 {
+  font-size: var(--text-base);
+}
+
+p {
+  line-height: 1.6;
+  color: hsl(var(--foreground));
+}
+
+/* Long-form text: cap reading measure for optimal UX */
+.prose-content {
+  max-width: 65ch;
+  line-height: 1.7;
+}
+
+/* ── Links ───────────────────────────────────────────────── */
+
+a {
+  color: hsl(var(--primary));
+  text-decoration-thickness: from-font;
+  text-underline-offset: 3px;
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+a:hover {
+  color: hsl(var(--primary-700));
+  opacity: 0.9;
+}
+
+/* ── Lists ───────────────────────────────────────────────── */
+
+ul,
+ol {
+  padding-left: 1.5em;
+}
+
+li {
+  line-height: 1.6;
+}
+
+/* ── Images ──────────────────────────────────────────────── */
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── Forms ───────────────────────────────────────────────── */
+
+button,
+[type="button"],
+[type="reset"],
+[type="submit"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ── Skip to main content link (WCAG 2.1) ───────────────── */
+
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  text-decoration: none;
+  transition: top 0.2s ease;
+
+  &:focus {
+    top: 1rem;
+    outline: 2px solid hsl(var(--primary-foreground));
+    outline-offset: 2px;
+  }
+}
+
+/* ── Scrollbar Styling (Webkit) ──────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.6);
+}
+
+/* ── Selection ───────────────────────────────────────────── */
+
+::selection {
+  background-color: hsl(var(--primary) / 0.2);
+  color: hsl(var(--foreground));
+}
+
+/* ── Skeleton Loading Animation ──────────────────────────── */
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--border)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s linear infinite;
+  border-radius: var(--radius);
+}
+
+/* ── Emergency SOS Bar ───────────────────────────────────── */
+
+.emergency-bar {
+  background-color: hsl(var(--danger-red));
+  color: hsl(var(--danger-red-foreground));
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0.35rem 0;
+}
+
+/* ── Status Badge Colors ─────────────────────────────────── */
+
+[data-status="PENDING"] {
+  --status-color: var(--warning-amber);
+}
+[data-status="REVIEWING"] {
+  --status-color: 212 80% 48%;
+}
+[data-status="IN_PROGRESS"] {
+  --status-color: 272 55% 52%;
+}
+[data-status="RESOLVED"] {
+  --status-color: var(--civic-green);
+}
+[data-status="REJECTED"] {
+  --status-color: var(--danger-red);
+}
+[data-status="CLOSED"] {
+  --status-color: 25 10% 60%;
+}
+
+/* ── Print Styles ────────────────────────────────────────── */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+    font-size: 12pt;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #555;
+  }
+}

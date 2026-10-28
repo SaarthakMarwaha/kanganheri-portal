@@ -1,0 +1,141 @@
+# ==============================================================================
+# Kanganheri Darpan (कांगनहेड़ी दर्पण) — Continuous Integration & Deployment
+# Automated Quality Gates: Lint, Type Check, Prisma Validate, Tests, Security & Docker
+# ==============================================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20.x"
+  DATABASE_URL: "postgresql://kanganheri_app:ci_dummy_pass@localhost:5432/kanganheri_db"
+  DIRECT_URL: "postgresql://kanganheri_app:ci_dummy_pass@localhost:5432/kanganheri_db"
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Static Analysis, Formatting & TypeScript Compilation
+  # ----------------------------------------------------------------------------
+  code-quality:
+    name: Code Quality & Type Safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Validate Prisma Schema
+        run: npx prisma validate
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript Strict Type Checking
+        run: npm run type-check
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Unit & Integration Test Suite
+  # ----------------------------------------------------------------------------
+  test-suite:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Vitest Test Suite
+        run: npm run test:run
+
+  # ----------------------------------------------------------------------------
+  # Job 3: Vulnerability & Dependency Security Audit
+  # ----------------------------------------------------------------------------
+  security-audit:
+    name: High-Severity Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Run Security Audit (High & Critical)
+        run: npm audit --audit-level=high
+
+  # ----------------------------------------------------------------------------
+  # Job 4: Multi-Stage Docker Container Build Verification
+  # ----------------------------------------------------------------------------
+  docker-verification:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+    needs: [code-quality, test-suite]
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker Layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker Image (Dry-Run / Verification)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: kanganheri/portal:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move Docker Layer Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
