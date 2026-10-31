@@ -23,6 +23,10 @@ const INTL_EXCLUDED_PATHS = [
   "/sitemap.xml",
   "/sw.js",
   "/manifest.json",
+  "/manifest.webmanifest",
+  "/icon",
+  "/apple-icon",
+  "/opengraph-image",
   "/uploads/",
 ];
 

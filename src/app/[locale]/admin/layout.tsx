@@ -90,6 +90,40 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
               </form>
             </div>
           </div>
+
+          {/* Mobile Admin Quick Navigation Bar */}
+          <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto border-t border-border/60 bg-muted/40 px-4 py-1.5 md:hidden">
+            <Link
+              href="/admin"
+              className="whitespace-nowrap rounded-md border border-border/50 bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/admin/complaints"
+              className="whitespace-nowrap rounded-md border border-border/50 bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+            >
+              Complaints
+            </Link>
+            <Link
+              href="/admin/directory"
+              className="whitespace-nowrap rounded-md border border-border/50 bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+            >
+              Directory
+            </Link>
+            <Link
+              href="/admin/notices"
+              className="whitespace-nowrap rounded-md border border-border/50 bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+            >
+              Notices
+            </Link>
+            <Link
+              href="/admin/audit-log"
+              className="whitespace-nowrap rounded-md border border-border/50 bg-background px-2.5 py-1 text-xs font-semibold text-foreground"
+            >
+              Audit Trail
+            </Link>
+          </div>
         </header>
       )}
 

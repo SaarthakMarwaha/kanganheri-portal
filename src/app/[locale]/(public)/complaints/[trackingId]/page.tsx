@@ -16,6 +16,113 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+const DEMO_COMPLAINTS_DETAIL: Record<
+  string,
+  {
+    id: string;
+    trackingId: string;
+    status: string;
+    category: string;
+    streetTag: string;
+    descriptionHi: string;
+    descriptionEn: string;
+    createdAt: Date;
+    photos: Array<{ id: string; publicUrl: string }>;
+    statusHistory: Array<{ toStatus: string; createdAt: Date; publicNote: string | null }>;
+  }
+> = {
+  "KH-2026-0001": {
+    id: "comp-sample-1",
+    trackingId: "KH-2026-0001",
+    status: "IN_PROGRESS",
+    category: "WATERLOGGING",
+    streetTag: "Primary School Road, Ward 42",
+    descriptionHi:
+      "स्कूल के सामने मुख्य रास्ते पर 2 फीट बारिश का पानी जमा है। बच्चों और ग्रामीणों का निकलना मुश्किल हो रहा है।",
+    descriptionEn:
+      "Severe water accumulation outside primary school entrance. Drainage blockage needs immediate pumping.",
+    createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 2),
+    photos: [],
+    statusHistory: [
+      {
+        toStatus: "PENDING",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 2),
+        publicNote: "शिकायत ऑनलाइन दर्ज हुई (Grievance logged via public portal).",
+      },
+      {
+        toStatus: "REVIEWING",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 1.5),
+        publicNote:
+          "कांगनहेड़ी ग्राम मॉडरेटर द्वारा समस्या सत्यापित की गई (Verified by village moderator).",
+      },
+      {
+        toStatus: "IN_PROGRESS",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 12),
+        publicNote:
+          "MCD नजफगढ़ वार्ड 42 ड्रेनेज टीम को पंपिंग एवं नाली सफाई हेतु भेजा गया (MCD squad dispatched).",
+      },
+    ],
+  },
+  "KH-2026-0002": {
+    id: "comp-sample-2",
+    trackingId: "KH-2026-0002",
+    status: "RESOLVED",
+    category: "BROKEN_STREETLIGHT",
+    streetTag: "Main Chaupal Marg",
+    descriptionHi:
+      "चौपाल के पास पोल नंबर 14 पर लगी LED लाइट पिछले 4 दिनों से बंद थी। अंधेरे के कारण वरिष्ठ नागरिकों को परेशानी थी।",
+    descriptionEn:
+      "Streetlight on pole #14 near Chaupal was non-functional. MCD electrical squad replaced the LED fixture.",
+    createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 4),
+    photos: [],
+    statusHistory: [
+      {
+        toStatus: "PENDING",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 4),
+        publicNote: "शिकायत दर्ज (Report registered).",
+      },
+      {
+        toStatus: "IN_PROGRESS",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 2),
+        publicNote:
+          "BSES / MCD स्ट्रीटलाइट मेंटेनेंस टीम को प्रेषित (Escalated to lighting division).",
+      },
+      {
+        toStatus: "RESOLVED",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 1),
+        publicNote:
+          "LED बल्ब और वायरिंग बदल दी गई है। लाइट सुचारू रूप से चालू है (Replaced & functional).",
+      },
+    ],
+  },
+  "KH-2026-0003": {
+    id: "comp-sample-3",
+    trackingId: "KH-2026-0003",
+    status: "REVIEWING",
+    category: "POTHOLE",
+    streetTag: "Najafgarh-Chhawla Link Mor",
+    descriptionHi:
+      "लिंक रोड पर बड़ा गड्ढा हो गया है, दोपहिया वाहन चालकों के गिरने का खतरा बना रहता है। पैचवर्क की आवश्यकता है।",
+    descriptionEn:
+      "Deep pothole developed on main link road bend posing risk to two-wheelers. PWD/MCD patch repair requested.",
+    createdAt: new Date(Date.now() - 3600 * 1000 * 18),
+    photos: [],
+    statusHistory: [
+      {
+        toStatus: "PENDING",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 18),
+        publicNote: "शिकायत ऑनलाइन दर्ज हुई (Grievance registered).",
+      },
+      {
+        toStatus: "REVIEWING",
+        createdAt: new Date(Date.now() - 3600 * 1000 * 6),
+        publicNote:
+          "सड़क निरीक्षण हेतु पीडब्ल्यूडी नजफगढ़ को सूचना प्रेषित (Inspection scheduled).",
+      },
+    ],
+  },
+};
+
 interface ComplaintDetailProps {
   params: Promise<{ locale: string; trackingId: string }>;
 }
@@ -57,6 +164,10 @@ export default async function ComplaintDetailPage({ params }: ComplaintDetailPro
     });
   } catch (err) {
     console.warn(`Notice: Failed to query complaint ${normalizedId}:`, err);
+  }
+
+  if (!complaint && DEMO_COMPLAINTS_DETAIL[normalizedId]) {
+    complaint = DEMO_COMPLAINTS_DETAIL[normalizedId];
   }
 
   if (!complaint) {

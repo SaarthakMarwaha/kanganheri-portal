@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import type { PageProps } from "@/types";
-import { Landmark, ShieldCheck, Award, Trees } from "lucide-react";
+import { Landmark, ShieldCheck, Award, Trees, MapPin, Compass } from "lucide-react";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -134,6 +134,71 @@ export default async function HeritagePage({ params }: PageProps) {
                 ? "कांगनहेड़ी एडवेंचर पार्क एवं इको-टूरिज्म पार्क दिल्ली पर्यटन (DTTDC) की एक प्रमुख पहल रही है, जहाँ ग्रामीण परिवेश के बीच जलक्रीड़ा, बोटिंग और प्राकृतिक सौंदर्य का आनंद लिया जा सकता है।"
                 : "The Kanganheri Adventure & Eco-Tourism Park, developed by DTTDC, represents an eco-recreation destination bringing urban visitors closer to rural wetlands and open nature."}
             </p>
+          </div>
+        </section>
+
+        {/* Section 5: Geographical & Demographic Profile */}
+        <section className="card-base space-y-6 border-l-4 border-l-primary p-6 sm:p-10">
+          <div className="flex items-center gap-2 border-b border-border/70 pb-3 text-lg font-bold text-primary">
+            <Compass className="h-5 w-5" aria-hidden="true" />
+            <h2>
+              {locale === "hi" ? "भौगोलिक एवं नागरिक परिदृश्य" : "Geographic & Civic Profile"}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2 md:grid-cols-3">
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "भौगोलिक निर्देशांक" : "Coordinates"}
+              </span>
+              <span className="flex items-center gap-1 font-mono text-sm font-bold text-foreground">
+                <MapPin className="h-3.5 w-3.5 text-primary" />
+                28.5468° N, 76.9883° E
+              </span>
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "नागरिक क्षेत्राधिकार" : "Civic Jurisdiction"}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {locale === "hi" ? "नजफगढ़ जोन • MCD" : "Najafgarh Zone • MCD"}
+              </span>
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "डाक पिन कोड" : "Postal PIN Code"}
+              </span>
+              <span className="font-mono text-sm font-bold text-primary">110071 (Chhawla SO)</span>
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "निकटतम पुलिस स्टेशन" : "Nearest Police Station"}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {locale === "hi" ? "छावला थाना (2.4 किमी)" : "Chhawla PS (~2.4 km)"}
+              </span>
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "मुख्य जिला अस्पताल" : "District Hospital"}
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {locale === "hi" ? "RTRM अस्पताल जाफरपुर" : "RTRM Hospital, Jaffarpur"}
+              </span>
+            </div>
+
+            <div className="space-y-1 rounded-lg border border-border/70 bg-background/60 p-3.5">
+              <span className="block font-medium text-muted-foreground">
+                {locale === "hi" ? "प्रमुख कृषि मंडियाँ" : "Primary Mandis"}
+              </span>
+              <span className="text-sm font-bold text-secondary">
+                {locale === "hi" ? "नजफगढ़, नरेला, झज्जर" : "Najafgarh, Narela, Jhajjar"}
+              </span>
+            </div>
           </div>
         </section>
       </div>

@@ -10,6 +10,7 @@ import { EmergencyBar } from "@/components/layout/emergency-bar";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { JsonLd } from "@/components/seo/json-ld";
+import { ServiceWorkerRegister } from "@/components/layout/service-worker-register";
 
 import "@/app/globals.css";
 
@@ -218,6 +219,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
               },
             }}
           />
+          {/* Offline Service Worker & status monitor */}
+          <ServiceWorkerRegister />
         </NextIntlClientProvider>
       </body>
     </html>

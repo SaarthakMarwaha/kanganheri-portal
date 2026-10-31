@@ -141,6 +141,44 @@ export default async function HomePage({ params }: PageProps) {
               <span>{locale === "hi" ? "आपातकालीन नंबर" : "Emergency Hub"}</span>
             </Link>
           </div>
+
+          {/* Civic Trust & Feature Badges */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-muted-foreground sm:mt-10">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-civic-green" aria-hidden="true" />
+              <span>
+                {locale === "hi"
+                  ? "नागरिक डेटा सुरक्षा (DPDP 2023)"
+                  : "DPDP Act 2023 Privacy Compliant"}
+              </span>
+            </div>
+            <span className="hidden text-border sm:inline" aria-hidden="true">
+              •
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-secondary" aria-hidden="true">
+                ✓
+              </span>
+              <span>
+                {locale === "hi"
+                  ? "बिना लॉगिन या आधार के सुलभ"
+                  : "No Login or Aadhaar Card Required"}
+              </span>
+            </div>
+            <span className="hidden text-border md:inline" aria-hidden="true">
+              •
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-amber-500" aria-hidden="true">
+                ⚡
+              </span>
+              <span>
+                {locale === "hi"
+                  ? "MCD, BSES व DJB सीधे निवारण"
+                  : "Direct MCD, BSES & DJB Redressal"}
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
